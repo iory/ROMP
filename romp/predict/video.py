@@ -1,5 +1,6 @@
-import sys 
+import sys
 whether_set_yml = ['configs_yml' in input_arg for input_arg in sys.argv]
+
 if sum(whether_set_yml)==0:
     default_webcam_configs_yml = "--configs_yml=configs/video.yml"
     print('No configs_yml is set, set it to the default {}'.format(default_webcam_configs_yml))
@@ -20,8 +21,8 @@ class Video_processor(Image_processor):
         video_basename, video_ext = os.path.splitext(video_file_path)
         assert video_ext in constants.video_exts, \
             print('Video format {} is not currently supported, please convert it to the frames by yourself.'.format(video_ext))
-        frame_list = video2frame(video_file_path, frame_save_dir=video_basename+'_frames')
-        return video_basename, frame_list
+        frame_list, timestamps = video2frame(video_file_path, frame_save_dir=video_basename+'_frames')
+        return video_basename, frame_list, timestamps
 
     @torch.no_grad()
     def process_video(self, video_file_path):
@@ -30,24 +31,30 @@ class Video_processor(Image_processor):
             frame_list = sorted(frame_list)
             video_basename = video_file_path
         elif os.path.exists(video_file_path):
-            video_basename, frame_list = self.toframe(video_file_path)
+            video_basename, frame_list, timestamps = self.toframe(video_file_path)
         else:
             raise('{} not exists!'.format(video_file_path))
         print('Processing {} frames of video {}, saving to {}'.format(len(frame_list), video_basename, self.output_dir))
         video_basename = os.path.basename(video_basename)
-        
+
         os.makedirs(self.output_dir, exist_ok=True)
-        self.visualizer.result_img_dir = self.output_dir 
+        self.visualizer.result_img_dir = self.output_dir
         counter = Time_counter(thresh=1)
 
-        internet_loader = self._create_single_data_loader(dataset='internet', train_flag=False, shuffle=False, file_list=frame_list)
+        internet_loader = self._create_single_data_loader(dataset='internet', train_flag=False, shuffle=False, file_list=frame_list,
+                                                          timestamps=timestamps)
         counter.start()
 
         results_frames = {}
         save_frame_list = []
 
+        frame_name_to_timestamps = {
+            fn: stamp for fn, stamp in zip(frame_list, timestamps)
+        }
+
         for test_iter,meta_data in enumerate(internet_loader):
             outputs = self.net_forward(meta_data, cfg=self.demo_cfg)
+
             reorganize_idx = outputs['reorganize_idx'].cpu().numpy()
             counter.count(self.val_batch_size)
             results = self.reorganize_results(outputs, outputs['meta_data']['imgpath'], reorganize_idx)
@@ -61,7 +68,7 @@ class Video_processor(Image_processor):
 
             if self.save_dict_results:
                 save_result_dict_tonpz(results, self.output_dir)
-                
+
             if self.save_visualization_on_img:
                 show_items_list = ['org_img', 'mesh']
                 if self.save_centermap:
@@ -77,7 +84,7 @@ class Video_processor(Image_processor):
 
             if self.save_mesh:
                 save_meshes(reorganize_idx, outputs, self.output_dir, self.smpl_faces)
-            
+
             if test_iter%8==0:
                 print('Processed {} / {} frames'.format(test_iter * self.val_batch_size, len(internet_loader.dataset)))
             counter.start()
@@ -92,7 +99,7 @@ class Video_processor(Image_processor):
             video_save_name = os.path.join(self.output_dir, video_basename+'_results.mp4')
             print('Writing results to {}'.format(video_save_name))
             frames2video(sorted(save_frame_list), video_save_name, fps=self.fps_save)
-        return results_frames
+        return results_frames, frame_name_to_timestamps
 
 def main():
     with ConfigContext(parse_args(sys.argv[1:])) as args_set:

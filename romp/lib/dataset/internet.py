@@ -17,16 +17,17 @@ from config import args
 import constants
 
 class Internet(Dataset):
-    def __init__(self, file_list=[], **kwargs):
+    def __init__(self, file_list=[], timestamps=None, **kwargs):
         super(Internet,self).__init__()
         assert isinstance(file_list, list), print('Error: Input file_list is supposed to be a list!')
         self.file_paths = file_list
-        
+        self.timestamps = timestamps
+
         print('Loading {} images to process'.format(len(self)))
 
     def get_image_info(self,index):
         return self.file_paths[index]
-        
+
     def resample(self):
         return self.__getitem__(random.randint(0,len(self)))
 
@@ -34,12 +35,15 @@ class Internet(Dataset):
 
         imgpath = self.get_image_info(index)
         image = cv2.imread(imgpath)
+        timestamp = self.timestamps[index]
         if image is None:
             index = self.resample()
             imgpath = self.get_image_info(index)
             image = cv2.imread(imgpath)
+            timestamp = self.timestamps[index]
 
         input_data = img_preprocess(image, imgpath=imgpath, input_size=args().input_size)
+        input_data['timestamp'] = timestamp
 
         return input_data
 
@@ -59,13 +63,13 @@ def img_preprocess(image, imgpath=None, input_size=512, ds='internet', single_im
     image = image[:,:,::-1]
     image_org, offsets = process_image(image)
     image = torch.from_numpy(cv2.resize(image_org, (input_size,input_size), interpolation=cv2.INTER_CUBIC))
-    
+
     offsets = torch.from_numpy(offsets).float()
-    
+
     if single_img_input:
         image = image.unsqueeze(0).contiguous()
         offsets = offsets.unsqueeze(0).contiguous()
-        
+
     input_data = {
         'image': image,
         'offsets': offsets,

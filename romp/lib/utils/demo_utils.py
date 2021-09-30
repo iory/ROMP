@@ -63,18 +63,22 @@ class OpenCVCapture:
             self.cap = cv2.VideoCapture(video_file)
             self.length = self.cap.get(cv2.CAP_PROP_FRAME_COUNT)
         self.whether_to_show=show
-
+        self.fps = self.cap.get(cv2.CAP_PROP_FPS)
+        self.prev_time = 0.0
 
     def read(self, return_rgb=True):
         flag, frame = self.cap.read()
         if not flag:
           return None
+        mills = self.prev_time + 1000 / self.fps
+        self.prev_time = mills
         if self.whether_to_show:
             cv2.imshow('webcam',frame)
             cv2.waitKey(1)
         if return_rgb:
             frame = np.flip(frame, -1).copy() # BGR to RGB
-        return frame
+        stamp = mills / 1000.0
+        return frame, stamp
 
 class Image_Reader:
     def __init__(self, image_folder):
@@ -236,12 +240,14 @@ def video2frame(video_name, frame_save_dir=None):
     cap = OpenCVCapture(video_name)
     os.makedirs(frame_save_dir, exist_ok=True)
     frame_list = []
+    timestamps = []
     for frame_id in range(int(cap.length)):
-        frame = cap.read(return_rgb=False)
+        frame, stamp = cap.read(return_rgb=False)
         save_path = os.path.join(frame_save_dir, '{:06d}.jpg'.format(frame_id))
         cv2.imwrite(save_path, frame)
         frame_list.append(save_path)
-    return frame_list
+        timestamps.append(stamp)
+    return frame_list, timestamps
 
 def frames2video(images_path, video_name,fps=30):
     writer = imageio.get_writer(video_name, format='mp4', mode='I', fps=fps)
