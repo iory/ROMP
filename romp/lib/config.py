@@ -212,7 +212,7 @@ class ConfigContext(object):
     accessed anywhere.
     """
     yaml_filename = yaml_timestamp
-    parsed_args = parse_args(# sys.argv[1:]
+    parsed_args = parse_args([]# sys.argv[1:]
     )
     def __init__(self, parsed_args=None):
         if parsed_args is not None:
