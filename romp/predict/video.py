@@ -95,10 +95,10 @@ class Video_processor(Image_processor):
             print('Saving parameter results to {}'.format(save_dict_path))
             np.savez(save_dict_path, results=results_frames)
 
-        if len(save_frame_list)>0:
-            video_save_name = os.path.join(self.output_dir, video_basename+'_results.mp4')
-            print('Writing results to {}'.format(video_save_name))
-            frames2video(sorted(save_frame_list), video_save_name, fps=self.fps_save)
+        # if len(save_frame_list)>0:
+        #     video_save_name = os.path.join(self.output_dir, video_basename+'_results.mp4')
+        #     print('Writing results to {}'.format(video_save_name))
+        #     frames2video(sorted(save_frame_list), video_save_name, fps=self.fps_save)
         return results_frames, frame_name_to_timestamps
 
 def main():
